@@ -1,0 +1,430 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+
+```{r}
+data <- read.csv("Live.csv")
+library(dplyr)
+library(tidyr)
+library(lattice)
+library(MASS)
+library(lubridate) 
+library(mdsr)
+library(scales)
+library(psych)
+library(tidyverse)
+#library(GGally)
+```
+```{r}
+# View(data)
+```
+
+```{r}
+summary(data[,4:12])
+```
+
+
+```{r}
+new <- data
+new = subset(new, select = -c(Column1, Column2, Column3, Column4) )
+new <- separate(new, status_id, into = c("seller_id", "user_id") , sep =  "_" )
+new <- separate(new, status_published, into =c("date", "time"), sep = " ")
+new
+```
+
+
+```{r}
+new %>% summarise_if(is.numeric, mean)
+```
+
+```{r}
+new %>% summarise_if(is.numeric, max)
+``` 
+
+```{r}
+pos_neg <- subset(new, select = c( status_type , num_wows, num_hahas, num_sads, num_angrys, num_loves ))
+pos_neg$positive <- pos_neg$num_wows + pos_neg$num_hahas + pos_neg$num_loves
+pos_neg$negative <- pos_neg$num_sads + pos_neg$num_angrys
+
+out3 <- pos_neg %>% 
+  group_by(status_type) %>% 
+  summarise(positive = mean(positive), negative = mean(negative))
+
+plot_1 <- ggplot(data=out3, aes(x= status_type, y= positive)) +
+  geom_bar(stat="identity", fill="purple") +
+  geom_text(aes(label=positive), vjust=-0.3, size=3.5)+
+  theme_minimal()
+```
+
+```{r}
+pos_neg <- subset(new, select = c( status_type , num_likes , num_wows, num_hahas, num_sads, num_angrys, num_loves ))
+pos_neg$positive <-pos_neg$num_likes + pos_neg$num_wows + pos_neg$num_hahas + pos_neg$num_loves
+pos_neg$negative <- pos_neg$num_sads + pos_neg$num_angrys
+
+pos_neg
+out3 <- pos_neg %>% 
+  group_by(status_type) %>% 
+  summarise(positive = mean(positive), negative = mean(negative))
+
+plot_2 <- ggplot(data=out3, aes(x= status_type, y= positive)) +
+  geom_bar(stat="identity", fill="steelblue") +
+  geom_text(aes(label=positive), vjust=-0.3, size=3.5)+
+  theme_minimal()
+
+
+```
+```{r}
+plot_3 <- ggplot(data=out3, aes(x= status_type, y=negative)) +
+  geom_bar(stat="identity", fill="maroon") +
+  geom_text(aes(label=negative), vjust=-0.3, size=3.5)+
+  theme_minimal()
+```
+
+
+```{r}
+library(gridExtra)
+grid.arrange(plot_1, plot_2, plot_3 ,ncol =3)
+```
+
+```{r}
+new$engagements <- new$num_likes + new$num_comments + new$num_shares
+# aggregate(new$engagements, by=list(Status=new$status_type), FUN=sum)
+out <- new %>% 
+  group_by(status_type) %>% 
+  summarise(engagements = mean(engagements))
+out<-arrange(out, engagements )
+out
+
+ggplot(data=out, aes(x= status_type, y=engagements)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  geom_text(aes(label=engagements), vjust=-0.3, size=3.5)+
+  theme_minimal()
+```
+
+
+
+
+
+```{r}
+clean = subset(new, select = -c( num_wows, num_hahas, num_sads, num_angrys, num_loves ))
+clean
+```
+```{r}
+status_count <- clean %>%
+  group_by(status_type) %>%
+    summarise_if(is.numeric,  mean)
+
+status_count
+```
+
+```{r}
+per_seller <- clean %>%
+  group_by(seller_id) %>%
+    summarise_if(is.numeric, sum) 
+per_seller <- arrange(per_seller, seller_id)
+per_seller
+```
+
+```{r}
+by_time <- clean %>%
+  group_by(seller_id, date, time) %>%
+    summarise_if(is.numeric, sum) 
+by_time <- arrange(by_time, seller_id, date, time)
+by_time
+```
+
+```{r}
+
+ggplot(data = by_time , aes(x = as.Date(date, "%m/%d/%Y") , y = num_reactions)) +
+  geom_point( size = 1) +
+  geom_line(color = "indianred3", 
+            size=1 ) +
+  geom_smooth() +
+  scale_x_date(breaks = '1 year', 
+               labels = date_format("%Y-%m-%d")) +
+  labs(title = "All seller reactions",
+       subtitle = "Yearly rate",
+       x = "Date",
+       y = "Num-reactions") +
+#ylim(0, 8000) +
+  theme_minimal()
+```
+```{r}
+ggplot(data = by_time , aes(x = as.Date(date, "%m/%d/%Y") , y = num_comments)) +
+  geom_point( size = 1) +
+  geom_line(color = "indianred3", 
+            size=1 ) +
+  geom_smooth() +
+  scale_x_date(date_breaks = '1 year', 
+               labels = date_format("%Y-%m-%d")) +
+  labs(title = "All seller comments",
+       subtitle = "Yearly rate",
+       x = "Date",
+       y = "Num-comments") +
+ # ylim(0, 10000) +
+  theme_minimal()
+```
+```{r}
+ggplot(data = by_time , aes(x = as.Date(date, "%m/%d/%Y") , y = num_shares)) +
+  geom_point( size = 1) +
+  geom_line(color = "indianred3", 
+            size=1 ) +
+  geom_smooth() +
+  scale_x_date(date_breaks = '1 year', 
+               labels = date_format("%Y-%m-%d")) +
+  labs(title = "All seller shares received",
+       subtitle = "Yearly rate",
+       x = "Date",
+       y = "Num-shares") +
+  #ylim(0, 3000) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(data = by_time , aes(x = as.Date(date, "%m/%d/%Y")  , y = num_comments)) +
+  geom_point(aes(shape = seller_id, color = seller_id), size = 1) +
+  scale_x_date(date_breaks = '1 year', 
+               labels = date_format("%Y-%m-%d")) 
+```
+
+
+```{r}
+new_copy <- clean
+new_copy$date <- as.Date(new_copy$date, "%m/%d/%Y")
+new_copy 
+before_live = filter(new_copy , date < "2016-06-04")
+after_live = filter(new_copy , date >= "2016-06-04")
+on_live_day = filter(new_copy , date == "2016-06-04")
+before_live
+```
+```{r}
+by_time <- before_live %>%
+  group_by(seller_id, date, time) %>%
+    summarise_if(is.numeric, sum) 
+by_time <- arrange(by_time, seller_id, date, time)
+by_time
+```
+
+```{r}
+after_live
+```
+
+```{r}
+pairs(~ num_likes + num_reactions + num_comments+ num_shares , data= clean,
+      lower.panel = panel.smooth)
+```
+```{r}
+pairs(~  num_reactions + num_comments+ num_shares , data= before_live,
+      lower.panel = panel.smooth)
+```
+```{r}
+pairs(~  num_reactions + num_comments+ num_shares , data= clean,
+      lower.panel = panel.smooth)
+```
+
+
+```{r}
+ggplot(data = clean, aes(x = num_reactions , y = num_likes )) +
+  geom_point() + geom_smooth(method = "lm", se = 0) + 
+  xlab("Number of reactions") + 
+  ylab("Number of likes")
+```
+```{r}
+ggplot(data = clean, aes(x = num_reactions , y = num_shares )) +
+  geom_point() + geom_smooth(method = "lm", se = 0) + 
+  xlab("Number of reactions") + 
+  ylab("Number of shares")
+```
+
+
+```{r}
+barplot(height=status_count$num_likes, names=status_count$status_type, 
+        col="#69b3a2",
+        horiz=T, las=1
+        )
+```
+
+```{r}
+split_date <- clean
+split_date$day <- factor(wday(as.Date(split_date$date, "%m/%d/%Y") -1))
+split_date$day_date <- factor(day(as.Date(split_date$date, "%m/%d/%Y")))
+split_date$month <- factor(format(as.Date(split_date$date, "%m/%d/%Y"),"%m"))
+split_date$time_hour <- factor(format(strptime(split_date$time,"%H:%M"),"%H"))
+glimpse(split_date)
+```
+
+
+```{r}
+pairs(~  engagements + time_hour + day_date + month + num_shares + num_comments , data= split_date,
+      lower.panel = panel.smooth)
+```
+```{r}
+out2 <- split_date %>% 
+  group_by(time_hour) %>% 
+  summarise(engagements = mean(engagements))
+out2<-arrange(out2, engagements )
+out2
+
+ggplot(data=out2, aes(x= time_hour, y=engagements)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  geom_text(aes(label=engagements), vjust=-0.3, size=3.5)+
+  theme_minimal()
+```
+
+```{r}
+library(fastDummies)
+split_date <- dummy_cols(split_date, select_columns = c('day', 'month', 'day_date', 'status_type', 'time_hour') )
+split_date
+```
+
+```{r}
+set.seed(1234)
+
+library(caTools)
+trainIndex <- sample.split( split_date$engagements , SplitRatio = 0.7, group = NULL )
+
+# Create separate training and test set records:
+trainingSet <- split_date[trainIndex,]
+testSet <- split_date[!trainIndex,]
+```
+
+```{r}
+# Assess the components (based on eigenvalues)
+fa.parallel(trainingSet[,6:10], fa="pc", n.iter=100, show.legend=FALSE, main="Scree plot with parallel analysis")
+
+# Perform PCA, and derive the rotated components
+pc <- principal(trainingSet[,6:10], nfactors=3, rotate="varimax", score=TRUE)
+pc
+
+# List the scoring formulas for the rotated components
+round(pc$weights, 2) 
+trainingSet <- cbind(trainingSet, pc$scores)
+
+# Generate rotated component scores for testSet
+testSet_RCscores <- predict(pc, testSet[,6:10], trainingSet[,6:10])
+testSet_RCscores
+testSet <- cbind(testSet,testSet_RCscores)
+testSet
+
+```
+
+```{r}
+#fitted <- lm( num_comments ~  status_type + num_shares + num_reactions , 
+#       data= trainingSet, na.action = na.exclude)
+
+fitted <- lm( engagements ~ num_reactions , 
+       data= trainingSet, na.action = na.exclude)
+
+summary(fitted)
+```
+```{r}
+par(mfrow=c(2,2))
+plot(fitted)
+```
+
+```{r}
+model.regression <- stepAIC(fitted, direction="forward")
+model.regression
+```
+
+```{r}
+#drawback on such models on COUNTS data, results are not integers
+testSet.predictRegression <- predict(model.regression, testSet)
+summary(testSet.predictRegression)
+```
+```{r}
+Dataset.Predict <- cbind(testSet.predictRegression,
+                         testSet$num_comments)
+#glimpse(Dataset.Predict)
+Dataset.Predict <- as.data.frame(Dataset.Predict)
+#glimpse(Dataset.Predict)
+
+names(Dataset.Predict) <- c("MLR","Target") 
+
+ggplot (data = Dataset.Predict) +
+  geom_point (mapping = aes (x = Target, 
+                             y = MLR-Target ), shape = 21, fill = "red") 
+```
+
+```{r}
+library(MLmetrics)
+
+R2_Score(testSet.predictRegression, testSet$engagements)
+RMSE(testSet.predictRegression, testSet$engagements)
+MAE(testSet.predictRegression, testSet$engagements)
+
+#R2_Score(testSet.predictRegression, testSet$num_comments)
+#RMSE(testSet.predictRegression, testSet$num_comments)
+#MAE(testSet.predictRegression, testSet$num_comments)
+```
+
+```{r}
+library(randomForest)
+
+trainingSet_1 = subset(trainingSet, select = -c( engagements, seller_id, user_id, status_type, date, time,  day_date, month, time_hour, day , num_comments, num_shares, num_likes ))
+testSet_1 = subset(testSet, select = -c( engagements, seller_id, user_id, status_type, date, time,  day_date, month, time_hour, day, num_comments, num_shares, num_likes))
+model_RF <- randomForest(trainingSet_1, trainingSet$engagements , ntree= 300 , mtry= 15 , importance=TRUE)
+
+# Importance of features
+round(importance(model_RF), 2)
+varImpPlot(model_RF,  n.var=10)
+
+testSet.predictRF <- predict(model_RF, testSet_1)
+
+```
+
+```{r}
+R2_Score(testSet.predictRF, testSet$engagements)
+RMSE(testSet.predictRF, testSet$engagements)
+MAE(testSet.predictRF, testSet$engagements)
+```
+
+
+
+```{r}
+library(e1071)
+
+model_svm <- svm(trainingSet_1, trainingSet$engagements, kernel="linear")
+
+model_svm <- svm(trainingSet_1, trainingSet$engagements, kernel="linear")
+
+# Make prediction
+testSet.predictSVM <- predict(model_svm, testSet_1)
+
+R2_Score(testSet.predictSVM, testSet$engagements)
+RMSE(testSet.predictSVM, testSet$engagements)
+MAE(testSet.predictSVM, testSet$engagements)
+```
+```{r}
+
+# cbind predicted value vectors into a dataset
+Dataset.Predict <- cbind(testSet.predictRegression,
+                      #   testSet.predictMLP,
+                         testSet.predictSVM,
+                         testSet.predictRF,
+                         testSet$engagements)
+
+# Convert matrix to data frame
+Dataset.Predict <- as.data.frame(Dataset.Predict)
+names(Dataset.Predict) <- c("REG", "SVM", "RF","Target")  # add header names
+
+# Plot residual (i.e. prediction errors) vs. target values
+ggplot (data = Dataset.Predict) +
+   geom_point (mapping = aes (x = Target, 
+                             y = REG-Target), shape = 21, fill = "red") +
+  #geom_point (mapping = aes (x = Target, 
+                            # y = MLP-Target), shape = 21, fill = "yellow") +
+  geom_point (mapping = aes (x = Target, 
+                           y = SVM-Target), shape = 21, fill = "green") +
+  geom_point (mapping = aes (x = Target, 
+                           y = RF-Target), shape = 21, fill = "blue")
+```
+
